@@ -103,6 +103,8 @@ def test_executor_falls_back_to_tool_output_when_llm_stripped():
     # Must contain the actual tool output, not just "完了"
     assert "# ファイルの内容" in results[0]
     assert "完了" not in results[0]
+    # Must include a visible warning that injection was detected
+    assert "⚠" in results[0]
 
 
 def test_executor_uses_llm_summary_when_present():

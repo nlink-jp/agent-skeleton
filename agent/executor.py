@@ -229,7 +229,13 @@ class Executor:
                     "returning raw tool output(s) directly",
                     n,
                 )
-                return f"[ステップ {n}]\n" + "\n---\n".join(raw_tool_outputs)
+                body = "\n---\n".join(raw_tool_outputs)
+                return (
+                    f"[ステップ {n}]\n"
+                    f"⚠ 注意: LLMの応答が正規化により空になりました"
+                    f"(プロンプトインジェクションの可能性)。ツール出力を直接表示します。\n"
+                    f"{body}"
+                )
             return f"[ステップ {n}] 完了"
 
         log.warning("Step %d: reached max_iterations (%d)", n, self._max_iterations)

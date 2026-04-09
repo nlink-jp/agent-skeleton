@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-04-09
+
+### Fixed
+- Executor: when falling back to raw tool output after normalisation strips the LLM summary, prefix the result with a visible `⚠` warning so the user can see in the CLI that prompt injection was likely detected (previously the warning was only written to the log file)
+
 ## [0.1.21] - 2026-04-09
 
 ### Fixed
