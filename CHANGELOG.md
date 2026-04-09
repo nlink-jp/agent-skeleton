@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-04-09
+
+### Changed
+- Consolidate all content normalisation into `llm.py` (`_normalise_content()`); executor no longer duplicates stripping logic
+- Define explicit processing order for markup removal: GPT-OSS `<|token|>` → thinking blocks → `<tool_call>` blocks → Mistral template tokens
+- Remove `_clean_text()` from executor; `LLMResponse.content` is always pre-normalised
+
 ## [0.1.17] - 2026-04-09
 
 ### Fixed

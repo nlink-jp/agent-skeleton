@@ -8,26 +8,72 @@ from .log import get_logger
 
 log = get_logger(__name__)
 
-# Thinking / reasoning blocks emitted by chain-of-thought models.
-# Covers both angle-bracket (<think>) and square-bracket ([THINK]) variants.
-# Strip the entire block — callers only need the final answer.
+# ---------------------------------------------------------------------------
+# Content normalisation patterns
+#
+# Processing order matters:
+#   1. <|token|>  — GPT-OSS special tokens: everything FROM the first token
+#                   onwards is model-internal structured payload; discard it all.
+#                   Must be first: no point running later patterns on the payload.
+#   2. <think>/[THINK] — CoT reasoning blocks: enclosed content is scratch-pad,
+#                   not the answer; remove the whole block.
+#   3. <tool_call> — hallucinated tool-call markup in text mode (Qwen3, Gemma):
+#                   remove the whole block.
+#   4. [INST]/<s> — Mistral template tokens: these delimit content that IS the
+#                   answer; strip only the tokens, keep the content between them.
+# ---------------------------------------------------------------------------
+
+# 1. GPT-OSS <|token|> — split at first occurrence, discard remainder
+_GPT_OSS_TOKEN_RE = re.compile(r"<\|[a-zA-Z0-9_]+\|>")
+
+# 2. Thinking / reasoning blocks (angle-bracket and square-bracket variants)
 _THINK_RE = re.compile(
     r"(<(think|thinking|reasoning)>.*?</\2>|\[THINK\].*?\[/THINK\])",
     re.DOTALL | re.IGNORECASE,
 )
 
-# Mistral / Mixtral instruction and sentence boundary tokens that may leak
-# into content when the model's chat template is not applied server-side.
+# 3. Hallucinated <tool_call> blocks in text mode
+_TOOL_CALL_RE = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL | re.IGNORECASE)
+
+# 4. Mistral / Mixtral template tokens (strip tokens, keep content between them)
 _MISTRAL_TOKEN_RE = re.compile(
-    r"(\[INST\]|\[/INST\]|<s>|</s>|\[SYS\]|\[/SYS\])",
+    r"\[/?INST\]|\[/?SYS\]|</?s>",
     re.IGNORECASE,
 )
 
-# GPT-OSS / gpt-oss-20b and similar models emit <|token|> special tokens
-# (e.g. <|start|>, <|channel|>, <|message|>) followed by model-internal
-# structured output.  Everything from the first such token onwards is
-# model-internal and must be discarded.
-_GPT_OSS_TOKEN_RE = re.compile(r"<\|[a-zA-Z0-9_]+\|>")
+
+def _normalise_content(raw: str) -> str:
+    """Strip model-internal markup from LLM text content.
+
+    Applied in the order documented above so that each step only processes
+    content that is genuinely part of the answer.
+    """
+    text = raw
+
+    # 1. GPT-OSS: everything from the first <|token|> is internal payload
+    if _GPT_OSS_TOKEN_RE.search(text):
+        text = _GPT_OSS_TOKEN_RE.split(text, maxsplit=1)[0]
+        log.warning("Stripped GPT-OSS <|special_token|> payload from LLM response")
+
+    # 2. Thinking / reasoning blocks
+    cleaned = _THINK_RE.sub("", text)
+    if cleaned != text:
+        log.debug("Stripped thinking/reasoning block from LLM response")
+    text = cleaned
+
+    # 3. Hallucinated tool_call blocks
+    cleaned = _TOOL_CALL_RE.sub("", text)
+    if cleaned != text:
+        log.warning("Stripped hallucinated <tool_call> block from LLM response")
+    text = cleaned
+
+    # 4. Mistral template tokens (keep the content between them)
+    cleaned = _MISTRAL_TOKEN_RE.sub("", text)
+    if cleaned != text:
+        log.debug("Stripped Mistral template tokens from LLM response")
+    text = cleaned
+
+    return text.strip()
 
 
 @dataclass
@@ -67,21 +113,7 @@ class LLMClient:
         elapsed = time.monotonic() - t0
         msg = response.choices[0].message
 
-        # Normalise content: strip model-internal markup so callers always
-        # receive the final answer text only.
-        raw_content = msg.content or ""
-        clean_content = _THINK_RE.sub("", raw_content).strip()
-        if clean_content != raw_content.strip():
-            log.debug("Stripped thinking/reasoning block from LLM response")
-        before_mistral = clean_content
-        clean_content = _MISTRAL_TOKEN_RE.sub("", clean_content).strip()
-        if clean_content != before_mistral:
-            log.debug("Stripped Mistral instruction tokens from LLM response")
-        if _GPT_OSS_TOKEN_RE.search(clean_content):
-            # Discard everything from the first <|token|> onwards — it is all
-            # model-internal structured output (channel directives, JSON payloads).
-            clean_content = _GPT_OSS_TOKEN_RE.split(clean_content, maxsplit=1)[0].strip()
-            log.warning("Stripped GPT-OSS <|special_token|> markup from LLM response")
+        clean_content = _normalise_content(msg.content or "")
 
         if msg.tool_calls:
             calls = [(tc.function.name, tc.function.arguments[:80]) for tc in msg.tool_calls]

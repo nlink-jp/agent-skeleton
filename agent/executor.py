@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -16,33 +15,6 @@ log = get_logger(__name__)
 
 # Signature: (tool_name: str, args: dict, reason: str) -> bool
 ApproverFn = Callable[[str, dict, str], bool]
-
-# Some local LLMs emit internal markup in text-mode responses.
-# Pattern 1: XML <tool_call> tags (Qwen3 etc.)
-_XML_TOOL_CALL_RE = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL | re.IGNORECASE)
-# Pattern 2: <|special_token|> sequences (gpt-oss, Mistral, etc.)
-#   These tokens mark model-internal structured output; everything from the
-#   first token onwards is model-internal and should be discarded.
-_SPECIAL_TOKEN_RE = re.compile(r"<\|[a-zA-Z0-9_]+\|>")
-
-
-def _clean_text(text: str) -> str:
-    """Remove model-internal markup from a text-mode LLM response.
-
-    Handles:
-    - XML <tool_call>…</tool_call> fragments (Qwen3, Gemma etc.)
-    - <|special_token|> sequences (gpt-oss, Mistral etc.) and their payload
-    """
-    cleaned = _XML_TOOL_CALL_RE.sub("", text).strip()
-    if cleaned != text.strip():
-        log.warning("Stripped XML tool_call markup from LLM text response")
-
-    if _SPECIAL_TOKEN_RE.search(cleaned):
-        log.warning("Stripped <|special_token|> markup from LLM text response: %r", cleaned[:80])
-        # Keep only the text that precedes the first special token.
-        cleaned = _SPECIAL_TOKEN_RE.split(cleaned, maxsplit=1)[0].strip()
-
-    return cleaned
 
 
 class Executor:
@@ -103,7 +75,7 @@ class Executor:
             context = self._build_context(description, reason, previous_results)
             messages = history + [{"role": "user", "content": context}]
             response = self._llm.chat(messages)
-            return f"[ステップ {n}] {_clean_text(response.content or '完了')}"
+            return f"[ステップ {n}] {response.content or "完了"}"
 
         tool = self._tools.get(tool_name)
         if tool is None:
@@ -130,7 +102,7 @@ class Executor:
             if not response.tool_calls:
                 # LLM chose to respond with text (step complete or no tool needed)
                 log.debug("Step %d: LLM returned text (no tool_call)", n)
-                return f"[ステップ {n}] {_clean_text(response.content or '完了')}"
+                return f"[ステップ {n}] {response.content or "完了"}"
 
             # Deduplicate tool_calls by (name, arguments) — some models (e.g. Gemma-4)
             # return dozens of identical calls in a single response.
@@ -222,7 +194,7 @@ class Executor:
             )
             final = self._llm.chat(messages)
             log.debug("Step %d: final LLM response collected", n)
-            return f"[ステップ {n}] {_clean_text(final.content or '完了')}"
+            return f"[ステップ {n}] {final.content or "完了"}"
 
         log.warning("Step %d: reached max_iterations (%d)", n, self._max_iterations)
         return f"[ステップ {n}] 最大反復回数({self._max_iterations})に達しました"
