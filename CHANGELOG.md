@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-04-09
+
+### Fixed
+- LLMClient: strip `<think>`, `<thinking>`, `<reasoning>` blocks from `content` before returning; chain-of-thought models (Qwen3 thinking mode, DeepSeek-R1 etc.) embed these in the response text, corrupting planner JSON parsing, step results, and memory
+- LLMClient: strip Mistral/Mixtral instruction tokens (`[INST]`, `[/INST]`, `<s>`, `</s>`, `[SYS]`, `[/SYS]`) that may leak into content when the chat template is not applied server-side
+
+### Changed
+- LLMClient now returns `LLMResponse` dataclass instead of raw `ChatCompletionMessage`; normalised content is always clean of model-internal markup
+
 ## [0.1.14] - 2026-04-09
 
 ### Fixed
