@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-04-09
+
+### Fixed
+- Planner: pass prior user/assistant turns from memory to `create_plan()`; previously the planner had no conversation context, causing incorrect plans for memory-referencing requests
+
 ## [0.1.7] - 2026-04-09
 
 ### Fixed

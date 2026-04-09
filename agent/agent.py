@@ -102,7 +102,8 @@ class Agent:
     def plan(self, user_goal: str) -> dict:
         """Generate and return a plan for the given goal."""
         log.info("Agent.plan: %r", user_goal)
-        return self._planner.create_plan(user_goal)
+        history = self._memory.get_messages(AGENT_SYSTEM_PROMPT)
+        return self._planner.create_plan(user_goal, history=history)
 
     def format_plan(self, plan: dict) -> str:
         return self._planner.format_plan(plan)

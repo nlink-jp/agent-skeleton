@@ -41,18 +41,24 @@ class Planner:
         self._tools = tools
         log.debug("Planner initialized with %d tool(s): %s", len(tools), [t.name for t in tools])
 
-    def create_plan(self, user_goal: str) -> dict:
+    def create_plan(self, user_goal: str, history: list[dict] | None = None) -> dict:
         log.info("Planning for goal: %r", user_goal)
         tool_list = "\n".join(
             f"- {t.name}: {t.description}" for t in self._tools
         )
-        messages = [
-            {"role": "system", "content": PLAN_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Available tools:\n{tool_list}\n\nUser goal:\n{user_goal}",
-            },
-        ]
+        messages: list[dict] = [{"role": "system", "content": PLAN_SYSTEM_PROMPT}]
+        # Include prior user/assistant turns so the planner understands what
+        # has already been done or discussed (skip system messages — the
+        # planner has its own system prompt).
+        if history:
+            prior = [m for m in history if m["role"] in ("user", "assistant")]
+            if prior:
+                log.debug("Planner: including %d prior turn(s) from memory", len(prior))
+                messages.extend(prior)
+        messages.append({
+            "role": "user",
+            "content": f"Available tools:\n{tool_list}\n\nUser goal:\n{user_goal}",
+        })
         response = self._llm.chat(messages)
         raw = response.content or ""
         log.debug("Raw plan response (%d chars): %s", len(raw), raw[:300])
