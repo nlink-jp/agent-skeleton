@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-04-09
+
+### Added
+- Built-in tool `directory_list`: list files and directories at a given path (like `ls`); shows names, types (file/dir), sizes; supports `show_hidden` flag and PathGuard integration
+
 ## [0.1.9] - 2026-04-09
 
 ### Changed

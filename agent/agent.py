@@ -11,7 +11,7 @@ from .memory import Memory
 from .planner import Planner
 from .security import PathGuard
 from .tools.base import Tool
-from .tools.file_tool import FileReadTool, FileWriteTool
+from .tools.file_tool import DirectoryListTool, FileReadTool, FileWriteTool
 from .tools.shell_tool import ShellTool
 from .tools.web_tool import WebSearchTool
 
@@ -72,6 +72,7 @@ class Agent:
         path_guard = PathGuard(extra_allowed=cfg.security.allowed_paths)
 
         builtin_tools: list[Tool] = [
+            DirectoryListTool(path_guard=path_guard),
             FileReadTool(path_guard=path_guard),
             FileWriteTool(path_guard=path_guard),
             ShellTool(path_guard=path_guard),
