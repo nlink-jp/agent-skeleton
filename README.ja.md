@@ -5,10 +5,12 @@
 ## 特徴
 
 - **計画優先の実行** — 自然言語の指示から実行計画を生成し、何も行う前にユーザーの承認を求めます
+- **ReAct 実行ループ** — 計画承認後、LLM が蓄積された結果に基づいて動的にツールを選択して実行します（計画に縛られません）。計画のツール名は非拘束ヒントとして渡されます
 - **ツール実行の承認** — すべてのツール呼び出し前に、ツール名・引数・理由を提示してユーザーの確認を待ちます
 - **マルチターンメモリ** — 会話履歴を保持し、コンテキストウィンドウが逼迫した場合は LLM による自動圧縮を行います
-- **内蔵ツール** — `file_read`・`file_write`・`shell_exec`（危険コマンド検出付き）・`web_search`（DuckDuckGo）
+- **内蔵ツール** — `ls`・`file_read`・`file_write`・`shell_exec`（危険コマンド検出付き）・`web_search`（DuckDuckGo）
 - **MCP サポート** — 起動時に MCP サーバー（stdio または SSE）へ接続し、内蔵ツールと同一インターフェースで利用可能
+- **ローカルLLM正規化** — モデル内部マークアップ（GPT-OSS トークン、思考ブロック、Gemma-4/Qwen3 のハルシネーション tool_call、Mistral テンプレートトークン）を除去
 - **コア/UI 分離** — `agent/` パッケージは独立してインポート可能。CLI は薄いラッパーとして機能
 
 ## インストール
@@ -75,10 +77,11 @@ print(result)
 ユーザー入力
   → Planner.create_plan()        # LLM が JSON 形式の計画を生成
   → CLI が計画を表示             # ユーザーが承認 / キャンセル
-  → Executor.execute_plan()      # ステップを反復処理
-      → LLM がツール呼び出しを生成
+  → Executor.execute_react()     # ReAct ループ（動的ツール選択）
+      → LLM がツールを選択（全ツール + 計画ヒント付き）
       → approver(ツール, 引数, 理由)  # ユーザーが承認 / スキップ
       → Tool.execute()
+      → LLM が要約し、次のアクションを決定または完了
   → 結果を Memory に保存
 ```
 
@@ -87,6 +90,7 @@ print(result)
 ## ドキュメント
 
 - [English README](README.md)
-- [アーキテクチャドキュメント](docs/architecture.ja.md)
+- [アーキテクチャドキュメント](docs/architecture.ja.md) / [Architecture (en)](docs/architecture.md)
+- [プロンプトインジェクションデモ](docs/demo-prompt-injection.ja.md) / [Demo (en)](docs/demo-prompt-injection.md)
 - [変更履歴](CHANGELOG.md)
 - [設定ファイルサンプル](config.example.toml)

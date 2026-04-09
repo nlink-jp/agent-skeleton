@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-04-10
+
+### Fixed
+- LLMClient: extend hallucinated tool-call stripping to Gemma-4 variant `<|tool_call>...<tool_call|>` (pipe-delimited); previously only Qwen3-style `<tool_call>...</tool_call>` was matched
+- Executor: include full conversation history (user/assistant turns) in ReAct loop messages; previously only system messages were kept, causing the LLM to lose context from prior turns ("which file?" when the user said "show me the file I just made")
+- Executor: append forced text summary to messages as an assistant turn so the LLM retains its own reasoning across iterations (e.g. knows it already ran `ls` and should now call `file_read`)
+- Executor: strip echoed `[アクション N]` label prefix from LLM summaries to prevent doubled labels like `[アクション 2] [アクション 1] ...`
+- Executor: when forced summary is empty because a hallucinated `<tool_call>` was stripped (`tool_call_stripped=True`), show a simple completion message instead of the `⚠ prompt injection` warning; this eliminates frequent false positives on Gemma-4
+
+### Changed
+- LLMClient: `_normalise_content()` now returns `_NormResult` dataclass carrying the cleaned text and a `tool_call_stripped` flag; `LLMResponse` exposes this flag so callers can distinguish hallucinated tool calls from potential prompt injection
+- Executor: `execute_react()` accepts optional `tool_hints` parameter — a list of tool names from the planner included as a non-binding hint in the user message so the LLM is more likely to pick the right tools
+- Agent: `execute()` extracts tool names from the plan and passes them as `tool_hints` to `execute_react()`
+- Architecture doc: add §6 "コンテキストウィンドウ設計" detailing how each component uses the LLM context window
+
 ## [0.1.23] - 2026-04-09
 
 ### Changed

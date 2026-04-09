@@ -34,7 +34,7 @@ agent-skeleton/
 │   ├── executor.py            ← step execution, per-tool approval loop
 │   ├── tools/
 │   │   ├── base.py            ← Tool ABC, ToolResult
-│   │   ├── file_tool.py       ← FileReadTool, FileWriteTool
+│   │   ├── file_tool.py       ← DirectoryListTool(ls), FileReadTool, FileWriteTool
 │   │   ├── shell_tool.py      ← ShellTool + dangerous pattern guard
 │   │   └── web_tool.py        ← WebSearchTool (DuckDuckGo)
 │   └── mcp/
@@ -42,10 +42,13 @@ agent-skeleton/
 ├── cli/
 │   └── app.py                 ← Rich CLI, approval dialogs
 └── tests/
-    ├── test_memory.py
-    ├── test_shell_tool.py
+    ├── test_executor.py       ← ReAct loop, tool_hints, injection detection
     ├── test_file_tool.py
-    └── test_planner.py
+    ├── test_llm.py            ← Content normalisation (Gemma-4/Qwen3/GPT-OSS)
+    ├── test_memory.py
+    ├── test_planner.py
+    ├── test_security.py       ← PathGuard (30 tests)
+    └── test_shell_tool.py
 ```
 
 ## Environment variables / config
@@ -65,4 +68,5 @@ Key settings:
 - **Token estimation**: uses `chars // 4` approximation. Sufficient for triggering compression; not exact.
 - **Shell safety**: `ShellTool` refuses dangerous commands unconditionally (before the user approval step). The approval callback is never called for refused commands.
 - **Planner JSON fallback**: if the LLM returns malformed JSON, `Planner._parse_plan()` falls back to a single-step plan so execution can still proceed.
+- **Gemma-4 normalisation**: Gemma-4 outputs `<|tool_call>...<tool_call|>` (pipe-delimited) in text mode instead of using OpenAI function calling. The normaliser strips these; `tool_call_stripped` flag distinguishes this from prompt injection.
 - **Core/CLI separation**: `agent/` has no dependency on `cli/`. Import direction is strictly `cli → agent`.

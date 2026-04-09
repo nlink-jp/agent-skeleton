@@ -5,10 +5,12 @@ Proof-of-concept skeleton for an autonomous agent. Demonstrates the core loop of
 ## Features
 
 - **Plan-first execution** — generates a step-by-step plan from natural language, shows it to the user for approval before doing anything
+- **ReAct execution loop** — after plan approval, the LLM dynamically picks tools based on accumulated results (not locked to the plan); plan tool names are passed as non-binding hints
 - **Per-tool approval** — before every tool call, displays the tool name, arguments, and reason; waits for user confirmation
 - **Multi-turn memory** — retains conversation history with automatic LLM-based context compression when the context window fills
-- **Built-in tools** — `file_read`, `file_write`, `shell_exec` (with dangerous command guard), `web_search` (DuckDuckGo)
+- **Built-in tools** — `ls`, `file_read`, `file_write`, `shell_exec` (with dangerous command guard), `web_search` (DuckDuckGo)
 - **MCP support** — connects to MCP servers (stdio or SSE) at startup; MCP tools appear alongside built-in tools
+- **Local LLM normalisation** — strips model-internal markup (GPT-OSS tokens, thinking blocks, hallucinated tool calls for Gemma-4/Qwen3, Mistral template tokens)
 - **Core/UI separation** — `agent/` package is independently importable; CLI is a thin wrapper
 
 ## Installation
@@ -73,12 +75,13 @@ print(result)
 
 ```
 User input
-  → Planner.create_plan()      # LLM generates JSON plan
-  → CLI displays plan          # user approves/cancels
-  → Executor.execute_plan()    # iterates over steps
-      → LLM generates tool call
+  → Planner.create_plan()        # LLM generates JSON plan
+  → CLI displays plan            # user approves/cancels
+  → Executor.execute_react()     # ReAct loop (dynamic tool selection)
+      → LLM picks a tool (with all tools + plan hints)
       → approver(tool, args, reason)  # user approves/skips
       → Tool.execute()
+      → LLM summarises, decides next action or finishes
   → result stored in Memory
 ```
 
@@ -87,6 +90,7 @@ Context compression triggers when estimated tokens exceed `context_limit × comp
 ## Documentation
 
 - [日本語 README](README.ja.md)
-- [Architecture (ja)](docs/architecture.ja.md)
+- [Architecture](docs/architecture.md) / [アーキテクチャ (ja)](docs/architecture.ja.md)
+- [Prompt Injection Demo](docs/demo-prompt-injection.md) / [デモ (ja)](docs/demo-prompt-injection.ja.md)
 - [Changelog](CHANGELOG.md)
 - [Config example](config.example.toml)
