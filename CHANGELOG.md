@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-04-09
+
+### Changed
+- Rename `directory_list` tool to `ls`; LLMs reliably select the built-in tool instead of falling back to `shell_exec` with an `ls` command
+
 ## [0.1.12] - 2026-04-09
 
 ### Fixed

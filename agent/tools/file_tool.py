@@ -54,11 +54,11 @@ class DirectoryListTool(Tool):
 
     @property
     def name(self) -> str:
-        return "directory_list"
+        return "ls"
 
     @property
     def description(self) -> str:
-        return "List files and directories at a given path (like ls). Returns names, types, and sizes."
+        return "List files and directories at a given path. Use this instead of shell_exec for directory listing. Returns entry names, types (file/dir), and file sizes."
 
     @property
     def parameters(self) -> dict:
