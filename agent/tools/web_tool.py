@@ -30,7 +30,7 @@ class WebSearchTool(Tool):
         max_results: int = int(kwargs.get("max_results", 5))
 
         try:
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS
 
             with DDGS() as ddgs:
                 results = list(ddgs.text(query, max_results=max_results))

@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-09
+
+### Changed
+- Migrate web search dependency from `duckduckgo-search` to `ddgs` (package renamed in v8); update import in `web_tool.py`
+
 ## [0.1.5] - 2026-04-09
 
 ### Fixed

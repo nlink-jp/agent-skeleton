@@ -10,8 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
     "openai>=1.0",
     "mcp>=1.0",
-    "duckduckgo-search>=7.0",
     "rich>=13.0",
+    "ddgs>=9.13.0",
 ]
 
 [project.scripts]
