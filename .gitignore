@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+dist/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Credentials
+.env
+
+# Local config overrides
+*.local.toml
+*.local.yaml
+*.local.json
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,29 @@
+# agent-skeleton configuration example
+# Copy to ~/.config/agent-skeleton/config.toml and edit as needed.
+# All values shown are defaults; omit sections you don't need to change.
+
+[llm]
+base_url      = "http://localhost:1234/v1"   # OpenAI-compatible endpoint
+api_key       = "dummy"                       # Set if your server requires auth
+model         = "local-model"                 # Model name as expected by the server
+context_limit = 65536                         # Effective token limit (64K recommended for local LLMs)
+
+[agent]
+compress_threshold = 0.75   # Compress history when context reaches this fraction of context_limit
+keep_recent_turns  = 8      # Number of recent turns to keep verbatim after compression
+max_iterations     = 20     # Maximum LLM iterations per plan step
+
+# --- MCP servers (optional) ---
+# Add one [[mcp.servers.<name>]] section per server.
+
+# Example: local stdio server
+# [mcp.servers.filesystem]
+# transport = "stdio"
+# command   = "npx"
+# args      = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+# env       = {}              # Optional extra environment variables
+
+# Example: remote SSE server
+# [mcp.servers.remote]
+# transport = "sse"
+# url       = "http://localhost:8080/sse"

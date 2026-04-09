@@ -1,0 +1,23 @@
+[project]
+name = "agent-skeleton"
+version = "0.1.0"
+description = "Autonomous agent skeleton: plan → approve → execute with built-in tools and MCP support"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=1.0",
+    "mcp>=1.0",
+    "duckduckgo-search>=7.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+agent-skeleton = "main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
