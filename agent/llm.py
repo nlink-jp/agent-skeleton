@@ -18,7 +18,8 @@ log = get_logger(__name__)
 #   2. <think>/[THINK] — CoT reasoning blocks: enclosed content is scratch-pad,
 #                   not the answer; remove the whole block.
 #   3. <tool_call> — hallucinated tool-call markup in text mode (Qwen3, Gemma):
-#                   remove the whole block.
+#                   remove the whole block.  Includes Gemma-4 variant with pipe
+#                   delimiters: <|tool_call>...<tool_call|>.
 #   4. [INST]/<s> — Mistral template tokens: these delimit content that IS the
 #                   answer; strip only the tokens, keep the content between them.
 # ---------------------------------------------------------------------------
@@ -33,7 +34,12 @@ _THINK_RE = re.compile(
 )
 
 # 3. Hallucinated <tool_call> blocks in text mode
-_TOOL_CALL_RE = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL | re.IGNORECASE)
+#    Variant A: Qwen3 style  — <tool_call>...</tool_call>
+#    Variant B: Gemma-4 style — <|tool_call>...<tool_call|>
+_TOOL_CALL_RE = re.compile(
+    r"<\|?tool_call\|?>.*?</?(?:\|?tool_call\|?|tool_call\|)>",
+    re.DOTALL | re.IGNORECASE,
+)
 
 # 4. Mistral / Mixtral template tokens (strip tokens, keep content between them)
 _MISTRAL_TOKEN_RE = re.compile(
@@ -42,13 +48,24 @@ _MISTRAL_TOKEN_RE = re.compile(
 )
 
 
-def _normalise_content(raw: str) -> str:
+@dataclass
+class _NormResult:
+    text: str
+    tool_call_stripped: bool = False
+
+
+def _normalise_content(raw: str) -> _NormResult:
     """Strip model-internal markup from LLM text content.
 
     Applied in the order documented above so that each step only processes
     content that is genuinely part of the answer.
+
+    Returns a *_NormResult* carrying the cleaned text and flags indicating
+    what was stripped (used by callers to distinguish hallucinated tool calls
+    from potential prompt injection).
     """
     text = raw
+    tool_call_stripped = False
 
     # 1. GPT-OSS: everything from the first <|token|> is internal payload
     if _GPT_OSS_TOKEN_RE.search(text):
@@ -65,6 +82,7 @@ def _normalise_content(raw: str) -> str:
     cleaned = _TOOL_CALL_RE.sub("", text)
     if cleaned != text:
         log.warning("Stripped hallucinated <tool_call> block from LLM response")
+        tool_call_stripped = True
     text = cleaned
 
     # 4. Mistral template tokens (keep the content between them)
@@ -73,7 +91,7 @@ def _normalise_content(raw: str) -> str:
         log.debug("Stripped Mistral template tokens from LLM response")
     text = cleaned
 
-    return text.strip()
+    return _NormResult(text=text.strip(), tool_call_stripped=tool_call_stripped)
 
 
 @dataclass
@@ -81,6 +99,7 @@ class LLMResponse:
     """Normalised LLM response — content has model-internal markup stripped."""
     content: str
     tool_calls: list = field(default_factory=list)
+    tool_call_stripped: bool = False
 
 
 class LLMClient:
@@ -113,13 +132,13 @@ class LLMClient:
         elapsed = time.monotonic() - t0
         msg = response.choices[0].message
 
-        clean_content = _normalise_content(msg.content or "")
+        norm = _normalise_content(msg.content or "")
 
         if msg.tool_calls:
             calls = [(tc.function.name, tc.function.arguments[:80]) for tc in msg.tool_calls]
             log.info("LLM response (%.1fs): %d tool_call(s): %s", elapsed, len(msg.tool_calls), calls)
         else:
-            preview = clean_content[:120].replace("\n", " ")
+            preview = norm.text[:120].replace("\n", " ")
             log.info("LLM response (%.1fs): text=%r", elapsed, preview)
 
         usage = response.usage
@@ -131,4 +150,8 @@ class LLMClient:
                 usage.total_tokens,
             )
 
-        return LLMResponse(content=clean_content, tool_calls=msg.tool_calls or [])
+        return LLMResponse(
+            content=norm.text,
+            tool_calls=msg.tool_calls or [],
+            tool_call_stripped=norm.tool_call_stripped,
+        )
