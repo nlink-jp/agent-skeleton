@@ -46,10 +46,10 @@ def run() -> None:
 
     while True:
         try:
-            # Rich の Prompt.ask() はマルチバイト文字の BS を正しく扱えないため、
-            # プロンプト表示のみ Rich に任せ、入力収集は組み込み input() を使う。
-            console.print("\n[bold green]あなた[/bold green]: ", end="")
-            user_input = input().strip()
+            # Prompt.ask() / console.print() + input() のどちらも ANSI エスケープが
+            # readline のカーソル位置計算を狂わせ、マルチバイト文字の BS が壊れる。
+            # プロンプト文字列を input() に直接渡すと readline が文字数を正しく把握できる。
+            user_input = input("\nあなた: ").strip()
         except (KeyboardInterrupt, EOFError):
             break
 

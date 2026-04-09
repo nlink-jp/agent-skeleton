@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-04-09
+
+### Fixed
+- CLI: pass prompt string directly to `input()` so readline correctly tracks cursor position; fixes multibyte (Japanese/CJK) backspace on all terminals
+
 ## [0.1.3] - 2026-04-09
 
 ### Fixed
