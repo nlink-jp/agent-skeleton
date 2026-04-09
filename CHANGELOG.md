@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-04-09
+
+### Fixed
+- PathGuard: allow `/dev/` subtree (pseudo-devices such as `/dev/null`, `/dev/stdin`); previously `2>/dev/null` in shell commands was incorrectly rejected
+- Executor: strip raw XML `<tool_call>` markup from text-mode LLM responses; some local LLMs emit these tags when forced to a no-tools call, which polluted `previous_results` for subsequent steps
+
 ## [0.1.10] - 2026-04-09
 
 ### Added

@@ -26,6 +26,11 @@ log = get_logger(__name__)
 # Supplements shlex tokenization which does not strip operator characters.
 _REDIRECT_RE = re.compile(r"(?:>>?|2>)\s*(/[^\s'\"<>|&;`]+)")
 
+# The /dev/ subtree contains kernel pseudo-devices (null, stdin, fd/*, etc.).
+# These are safe to allow regardless of configured roots — they are not real
+# filesystem paths that could be used to escape the sandbox.
+_DEV_PREFIX = "/dev/"
+
 
 def _is_relative_to(path: Path, root: Path) -> bool:
     """Return True if path is equal to root or a descendant of root."""
@@ -107,6 +112,9 @@ class PathGuard:
             resolved = Path(path).resolve()
         except Exception:
             return False
+        # /dev/ subtree contains kernel pseudo-devices — always permitted.
+        if str(resolved).startswith(_DEV_PREFIX) or str(Path(path)).startswith(_DEV_PREFIX):
+            return True
         return any(
             resolved == root or _is_relative_to(resolved, root)
             for root in self._roots

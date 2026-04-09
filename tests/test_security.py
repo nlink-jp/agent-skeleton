@@ -31,6 +31,20 @@ def test_tmp_is_allowed(guard):
     assert guard.is_allowed("/tmp/workfile.txt")
 
 
+def test_pseudo_devices_are_allowed(guard):
+    assert guard.is_allowed("/dev/null")
+    assert guard.is_allowed("/dev/stdin")
+    assert guard.is_allowed("/dev/stdout")
+    assert guard.is_allowed("/dev/stderr")
+    assert guard.is_allowed("/dev/zero")
+    assert guard.is_allowed("/dev/urandom")
+
+
+def test_check_command_dev_null_allowed(guard):
+    assert guard.check_command("ls -la *.md 2>/dev/null") is None
+    assert guard.check_command("cat file.txt > /dev/null") is None
+
+
 def test_outside_roots_denied(guard):
     assert not guard.is_allowed("/etc/passwd")
     assert not guard.is_allowed("/usr/bin/python")

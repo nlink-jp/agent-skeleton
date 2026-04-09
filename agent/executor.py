@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -15,6 +16,19 @@ log = get_logger(__name__)
 
 # Signature: (tool_name: str, args: dict, reason: str) -> bool
 ApproverFn = Callable[[str, dict, str], bool]
+
+# Some local LLMs emit raw XML tool_call markup in text mode after a
+# failed or forced no-tools response.  Strip these before using the
+# content as a step result.
+_XML_TOOL_CALL_RE = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL | re.IGNORECASE)
+
+
+def _clean_text(text: str) -> str:
+    """Remove any XML tool_call fragments from a text-mode LLM response."""
+    cleaned = _XML_TOOL_CALL_RE.sub("", text).strip()
+    if cleaned != text.strip():
+        log.warning("Stripped XML tool_call markup from LLM text response")
+    return cleaned
 
 
 class Executor:
@@ -75,7 +89,7 @@ class Executor:
             context = self._build_context(description, reason, previous_results)
             messages = history + [{"role": "user", "content": context}]
             response = self._llm.chat(messages)
-            return f"[ステップ {n}] {response.content or '完了'}"
+            return f"[ステップ {n}] {_clean_text(response.content or '完了')}"
 
         tool = self._tools.get(tool_name)
         if tool is None:
@@ -102,7 +116,7 @@ class Executor:
             if not response.tool_calls:
                 # LLM chose to respond with text (step complete or no tool needed)
                 log.debug("Step %d: LLM returned text (no tool_call)", n)
-                return f"[ステップ {n}] {response.content or '完了'}"
+                return f"[ステップ {n}] {_clean_text(response.content or '完了')}"
 
             # Deduplicate tool_calls by (name, arguments) — some models (e.g. Gemma-4)
             # return dozens of identical calls in a single response.
@@ -194,7 +208,7 @@ class Executor:
             )
             final = self._llm.chat(messages)
             log.debug("Step %d: final LLM response collected", n)
-            return f"[ステップ {n}] {final.content or '完了'}"
+            return f"[ステップ {n}] {_clean_text(final.content or '完了')}"
 
         log.warning("Step %d: reached max_iterations (%d)", n, self._max_iterations)
         return f"[ステップ {n}] 最大反復回数({self._max_iterations})に達しました"
