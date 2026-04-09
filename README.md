@@ -87,5 +87,6 @@ Context compression triggers when estimated tokens exceed `context_limit × comp
 ## Documentation
 
 - [日本語 README](README.ja.md)
+- [Architecture (ja)](docs/architecture.ja.md)
 - [Changelog](CHANGELOG.md)
 - [Config example](config.example.toml)

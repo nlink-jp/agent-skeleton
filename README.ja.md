@@ -87,5 +87,6 @@ print(result)
 ## ドキュメント
 
 - [English README](README.md)
+- [アーキテクチャドキュメント](docs/architecture.ja.md)
 - [変更履歴](CHANGELOG.md)
 - [設定ファイルサンプル](config.example.toml)
