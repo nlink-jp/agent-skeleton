@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .log import get_logger
+
 if TYPE_CHECKING:
     from .llm import LLMClient
+
+log = get_logger(__name__)
 
 COMPRESSION_SYSTEM_PROMPT = (
     "You are a conversation summarizer. "
@@ -33,6 +37,12 @@ class Memory:
         self._keep_recent = keep_recent_turns
         self.messages: list[dict] = []
         self.compressed_summary: str | None = None
+        log.debug(
+            "Memory initialized: context_limit=%d compress_at=%d keep_recent=%d",
+            context_limit,
+            self._compress_at,
+            keep_recent_turns,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -40,7 +50,16 @@ class Memory:
 
     def add(self, role: str, content: str) -> None:
         self.messages.append({"role": role, "content": content})
-        if self._estimate_tokens() >= self._compress_at:
+        tokens = self._estimate_tokens()
+        log.debug(
+            "Memory.add [%s]: %d chars → estimated %d tokens total",
+            role, len(content), tokens,
+        )
+        if tokens >= self._compress_at:
+            log.info(
+                "Memory: token estimate %d ≥ compress_at %d — triggering compression",
+                tokens, self._compress_at,
+            )
             self._compress()
 
     def get_messages(self, system_prompt: str) -> list[dict]:
@@ -53,6 +72,12 @@ class Memory:
                 }
             )
         result.extend(self.messages)
+        log.debug(
+            "Memory.get_messages: %d message(s) returned (summary=%s, recent=%d)",
+            len(result),
+            "yes" if self.compressed_summary else "no",
+            len(self.messages),
+        )
         return result
 
     def estimate_tokens(self) -> int:
@@ -70,7 +95,11 @@ class Memory:
 
     def _compress(self) -> None:
         if len(self.messages) <= self._keep_recent:
+            log.debug("Memory: compression skipped (messages=%d ≤ keep_recent=%d)", len(self.messages), self._keep_recent)
             return
+
+        n_compress = len(self.messages) - self._keep_recent
+        log.info("Memory: compressing %d turn(s), keeping %d recent", n_compress, self._keep_recent)
 
         to_compress = self.messages[: -self._keep_recent]
         self.messages = self.messages[-self._keep_recent :]
@@ -79,6 +108,7 @@ class Memory:
             f"{m['role'].upper()}: {m['content']}" for m in to_compress
         )
         if self.compressed_summary:
+            log.debug("Memory: chaining with existing summary (%d chars)", len(self.compressed_summary))
             history_text = (
                 f"[Previous summary]\n{self.compressed_summary}\n\n"
                 f"[New messages]\n{history_text}"
@@ -90,3 +120,8 @@ class Memory:
         ]
         response = self._llm.chat(summary_messages)
         self.compressed_summary = response.content or ""
+        log.info(
+            "Memory: compression done — summary=%d chars, remaining messages=%d",
+            len(self.compressed_summary),
+            len(self.messages),
+        )

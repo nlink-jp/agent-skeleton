@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from .log import get_logger
+
 if TYPE_CHECKING:
     from .llm import LLMClient
     from .tools.base import Tool
+
+log = get_logger(__name__)
 
 PLAN_SYSTEM_PROMPT = """\
 You are a planning agent. Given a user goal and a list of available tools, \
@@ -35,8 +39,10 @@ class Planner:
     def __init__(self, llm: LLMClient, tools: list[Tool]) -> None:
         self._llm = llm
         self._tools = tools
+        log.debug("Planner initialized with %d tool(s): %s", len(tools), [t.name for t in tools])
 
     def create_plan(self, user_goal: str) -> dict:
+        log.info("Planning for goal: %r", user_goal)
         tool_list = "\n".join(
             f"- {t.name}: {t.description}" for t in self._tools
         )
@@ -48,7 +54,17 @@ class Planner:
             },
         ]
         response = self._llm.chat(messages)
-        return self._parse_plan(response.content or "", user_goal)
+        raw = response.content or ""
+        log.debug("Raw plan response (%d chars): %s", len(raw), raw[:300])
+
+        plan = self._parse_plan(raw, user_goal)
+        steps = plan.get("steps", [])
+        log.info(
+            "Plan parsed: %d step(s) | tools used: %s",
+            len(steps),
+            [s.get("tool") for s in steps],
+        )
+        return plan
 
     def format_plan(self, plan: dict) -> str:
         lines = [f"目標: {plan.get('goal', '（不明）')}", ""]
@@ -70,8 +86,11 @@ class Planner:
         if start != -1 and end > start:
             try:
                 return json.loads(raw[start:end])
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                log.warning("JSON parse failed (%s); using fallback plan", e)
+        else:
+            log.warning("No JSON object found in plan response; using fallback plan")
+
         # Fallback: single-step plan so execution can still proceed
         return {
             "goal": user_goal,

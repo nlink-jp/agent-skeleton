@@ -6,12 +6,15 @@ from pathlib import Path
 from .config import Config, load_config
 from .executor import Executor
 from .llm import LLMClient
+from .log import get_logger
 from .memory import Memory
 from .planner import Planner
 from .tools.base import Tool
 from .tools.file_tool import FileReadTool, FileWriteTool
 from .tools.shell_tool import ShellTool
 from .tools.web_tool import WebSearchTool
+
+log = get_logger(__name__)
 
 AGENT_SYSTEM_PROMPT = """\
 You are a capable autonomous agent. You help users accomplish their goals by planning \
@@ -48,6 +51,11 @@ class Agent:
         config_path: Path | None = None,
     ) -> Agent:
         cfg: Config = load_config(config_path)
+        log.info(
+            "Agent.from_config: model=%s context_limit=%d",
+            cfg.llm.model,
+            cfg.llm.context_limit,
+        )
         llm = LLMClient(
             base_url=cfg.llm.base_url,
             api_key=cfg.llm.api_key,
@@ -68,6 +76,12 @@ class Agent:
         ]
         mcp_tools = cls._load_mcp_tools(cfg)
         all_tools = builtin_tools + mcp_tools
+        log.info(
+            "Tools loaded: %d built-in + %d MCP = %d total",
+            len(builtin_tools),
+            len(mcp_tools),
+            len(all_tools),
+        )
 
         planner = Planner(llm=llm, tools=all_tools)
         executor = Executor(
@@ -84,6 +98,7 @@ class Agent:
 
     def plan(self, user_goal: str) -> dict:
         """Generate and return a plan for the given goal."""
+        log.info("Agent.plan: %r", user_goal)
         return self._planner.create_plan(user_goal)
 
     def format_plan(self, plan: dict) -> str:
@@ -91,12 +106,16 @@ class Agent:
 
     def execute(self, user_goal: str, plan: dict) -> str:
         """Execute plan, record in memory, return combined result."""
+        log.info("Agent.execute: starting plan with %d step(s)", len(plan.get("steps", [])))
         history = self._memory.get_messages(AGENT_SYSTEM_PROMPT)
+        log.debug("Agent.execute: history has %d message(s)", len(history))
+
         step_results = self._executor.execute_plan(plan, history)
         combined = "\n".join(step_results)
 
         self._memory.add("user", user_goal)
         self._memory.add("assistant", combined)
+        log.info("Agent.execute: done. Memory tokens ≈ %d", self._memory.estimate_tokens())
         return combined
 
     # ------------------------------------------------------------------
@@ -106,11 +125,15 @@ class Agent:
     @staticmethod
     def _load_mcp_tools(cfg: Config) -> list[Tool]:
         if not cfg.mcp_servers:
+            log.debug("No MCP servers configured")
             return []
+        log.info("Loading MCP tools from %d server(s): %s", len(cfg.mcp_servers), list(cfg.mcp_servers))
         try:
             from .mcp.client import MCPManager
             manager = MCPManager()
-            return manager.load_all(cfg.mcp_servers)
+            tools = manager.load_all(cfg.mcp_servers)
+            log.info("MCP tools loaded: %d tool(s)", len(tools))
+            return tools
         except Exception as e:
-            print(f"[警告] MCP ツールの読み込みに失敗しました: {e}")
+            log.warning("MCP tool loading failed: %s", e)
             return []
