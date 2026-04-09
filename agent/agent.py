@@ -93,6 +93,7 @@ class Agent:
             tools=all_tools,
             approver=approver,
             max_iterations=cfg.agent.max_iterations,
+            max_tool_output_chars=cfg.agent.max_tool_output_chars,
         )
         return cls(llm=llm, memory=memory, planner=planner, executor=executor)
 

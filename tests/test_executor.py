@@ -307,6 +307,58 @@ def test_build_result_strips_echoed_action_label():
     assert result == "[アクション 2] ファイルをコピーしました"
 
 
+def test_truncate_tool_output():
+    """Long tool output should be truncated to max_tool_output_chars."""
+    tool = _EchoTool("x" * 50000)
+    llm = MagicMock()
+
+    tc = _make_tool_call()
+    llm.chat.side_effect = [
+        LLMResponse(content="", tool_calls=[tc]),
+        LLMResponse(content="done", tool_calls=[]),
+        LLMResponse(content="完了", tool_calls=[]),
+    ]
+
+    executor = Executor(
+        llm=llm, tools=[tool], approver=lambda *_: True,
+        max_tool_output_chars=1000,
+    )
+    executor.execute_react("big file", history=[])
+
+    # The tool message in the LLM call should be truncated
+    # Second call is the forced summary — check its messages
+    second_call_messages = llm.chat.call_args_list[1][0][0]
+    tool_msgs = [m["content"] for m in second_call_messages if m["role"] == "tool"]
+    assert len(tool_msgs) == 1
+    # Should contain truncation notice, not full 50000 chars
+    assert "truncated" in tool_msgs[0]
+    assert len(tool_msgs[0]) < 5000  # well under 50000
+
+
+def test_truncate_tool_output_short_unchanged():
+    """Short tool output should not be truncated."""
+    tool = _EchoTool("short output")
+    llm = MagicMock()
+
+    tc = _make_tool_call()
+    llm.chat.side_effect = [
+        LLMResponse(content="", tool_calls=[tc]),
+        LLMResponse(content="done", tool_calls=[]),
+        LLMResponse(content="完了", tool_calls=[]),
+    ]
+
+    executor = Executor(
+        llm=llm, tools=[tool], approver=lambda *_: True,
+        max_tool_output_chars=1000,
+    )
+    executor.execute_react("read", history=[])
+
+    second_call_messages = llm.chat.call_args_list[1][0][0]
+    tool_msgs = [m["content"] for m in second_call_messages if m["role"] == "tool"]
+    assert "short output" in tool_msgs[0]
+    assert "truncated" not in tool_msgs[0]
+
+
 def test_execute_react_includes_conversation_history():
     """ReAct loop must include prior user/assistant turns from history so the
     LLM knows what was done in previous conversation rounds."""

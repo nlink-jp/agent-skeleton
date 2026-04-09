@@ -73,6 +73,7 @@ def test_parse_plan_fallback_on_invalid_json():
     assert plan["goal"] == "do something"
     assert len(plan["steps"]) == 1
     assert plan["steps"][0]["tool"] is None
+    assert plan.get("fallback") is True
 
 
 def test_parse_plan_valid_json():
@@ -87,3 +88,4 @@ def test_parse_plan_valid_json():
     plan = planner.create_plan("Test goal")
     assert plan["goal"] == "Test goal"
     assert plan["steps"][0]["tool"] == "file_read"
+    assert plan.get("fallback") is None  # no fallback flag on success

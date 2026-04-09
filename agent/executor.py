@@ -77,15 +77,18 @@ class Executor:
         tools: list[Tool],
         approver: ApproverFn,
         max_iterations: int = 20,
+        max_tool_output_chars: int = 20000,
     ) -> None:
         self._llm = llm
         self._tools: dict[str, Tool] = {t.name: t for t in tools}
         self._approver = approver
         self._max_iterations = max_iterations
+        self._max_tool_output_chars = max_tool_output_chars
         log.debug(
-            "Executor initialized: %d tool(s), max_iterations=%d",
+            "Executor initialized: %d tool(s), max_iterations=%d, max_tool_output=%d",
             len(self._tools),
             max_iterations,
+            max_tool_output_chars,
         )
 
     # ------------------------------------------------------------------
@@ -174,10 +177,11 @@ class Executor:
 
                 tool_output = self._run_tool(fn_name, fn_args, reason=label, label=label)
                 raw_outputs.append(tool_output)
+                truncated = self._truncate_tool_output(tool_output)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": _wrap_tool_output(tool_output),
+                    "content": _wrap_tool_output(truncated),
                 })
 
             # Force a text response (no tools) to get an interim summary.
@@ -261,6 +265,17 @@ class Executor:
         else:
             log.warning("%s: tool '%s' failed (%.2fs): %s", label, fn_name, elapsed, result.error)
             return f"エラー: {result.error}"
+
+    def _truncate_tool_output(self, output: str) -> str:
+        """Truncate tool output if it exceeds max_tool_output_chars."""
+        limit = self._max_tool_output_chars
+        if len(output) <= limit:
+            return output
+        log.warning(
+            "Tool output truncated: %d → %d chars",
+            len(output), limit,
+        )
+        return output[:limit] + f"\n\n... (truncated; {len(output) - limit} chars omitted)"
 
     def _deduplicate(self, tool_calls: list, label: str) -> list:
         """Remove duplicate tool calls by (name, arguments)."""
@@ -353,10 +368,11 @@ class Executor:
 
                 tool_output = self._run_tool(fn_name, fn_args, reason=reason, label=f"Step {n}")
                 raw_tool_outputs.append(tool_output)
+                truncated = self._truncate_tool_output(tool_output)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": _wrap_tool_output(tool_output),
+                    "content": _wrap_tool_output(truncated),
                 })
 
             log.debug(
