@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-04-09
+
+### Fixed
+- PathGuard: tighten pseudo-device allowlist — permit only safe devices (`/dev/null`, stdio, `urandom`, `/dev/fd/*`); block devices (`/dev/sda`, `/dev/disk*`) remain denied
+
 ## [0.1.11] - 2026-04-09
 
 ### Fixed

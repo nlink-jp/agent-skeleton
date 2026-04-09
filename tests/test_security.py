@@ -40,6 +40,12 @@ def test_pseudo_devices_are_allowed(guard):
     assert guard.is_allowed("/dev/urandom")
 
 
+def test_block_devices_are_denied(guard):
+    assert not guard.is_allowed("/dev/sda")
+    assert not guard.is_allowed("/dev/disk0")
+    assert not guard.is_allowed("/dev/sda1")
+
+
 def test_check_command_dev_null_allowed(guard):
     assert guard.check_command("ls -la *.md 2>/dev/null") is None
     assert guard.check_command("cat file.txt > /dev/null") is None
