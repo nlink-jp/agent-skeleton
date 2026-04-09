@@ -17,17 +17,31 @@ log = get_logger(__name__)
 # Signature: (tool_name: str, args: dict, reason: str) -> bool
 ApproverFn = Callable[[str, dict, str], bool]
 
-# Some local LLMs emit raw XML tool_call markup in text mode after a
-# failed or forced no-tools response.  Strip these before using the
-# content as a step result.
+# Some local LLMs emit internal markup in text-mode responses.
+# Pattern 1: XML <tool_call> tags (Qwen3 etc.)
 _XML_TOOL_CALL_RE = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL | re.IGNORECASE)
+# Pattern 2: <|special_token|> sequences (gpt-oss, Mistral, etc.)
+#   These tokens mark model-internal structured output; everything from the
+#   first token onwards is model-internal and should be discarded.
+_SPECIAL_TOKEN_RE = re.compile(r"<\|[a-zA-Z0-9_]+\|>")
 
 
 def _clean_text(text: str) -> str:
-    """Remove any XML tool_call fragments from a text-mode LLM response."""
+    """Remove model-internal markup from a text-mode LLM response.
+
+    Handles:
+    - XML <tool_call>…</tool_call> fragments (Qwen3, Gemma etc.)
+    - <|special_token|> sequences (gpt-oss, Mistral etc.) and their payload
+    """
     cleaned = _XML_TOOL_CALL_RE.sub("", text).strip()
     if cleaned != text.strip():
         log.warning("Stripped XML tool_call markup from LLM text response")
+
+    if _SPECIAL_TOKEN_RE.search(cleaned):
+        log.warning("Stripped <|special_token|> markup from LLM text response: %r", cleaned[:80])
+        # Keep only the text that precedes the first special token.
+        cleaned = _SPECIAL_TOKEN_RE.split(cleaned, maxsplit=1)[0].strip()
+
     return cleaned
 
 

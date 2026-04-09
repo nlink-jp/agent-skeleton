@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-04-09
+
+### Fixed
+- Executor: extend `_clean_text` to strip `<|special_token|>` sequences (used by gpt-oss, Mistral etc.) from text-mode responses; content from the first special token onwards is discarded to prevent model-internal markup from polluting step results
+
 ## [0.1.13] - 2026-04-09
 
 ### Changed
