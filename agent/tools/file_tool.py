@@ -1,9 +1,18 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .base import Tool, ToolResult
 
+if TYPE_CHECKING:
+    from ..security import PathGuard
+
 
 class FileReadTool(Tool):
+    def __init__(self, path_guard: PathGuard | None = None) -> None:
+        self._guard = path_guard
+
     @property
     def name(self) -> str:
         return "file_read"
@@ -24,6 +33,12 @@ class FileReadTool(Tool):
 
     def execute(self, **kwargs) -> ToolResult:
         path = kwargs.get("path", "")
+
+        if self._guard:
+            err = self._guard.check_path(path)
+            if err:
+                return ToolResult(success=False, output="", error=err)
+
         try:
             content = Path(path).read_text(encoding="utf-8")
             return ToolResult(success=True, output=content)
@@ -34,6 +49,9 @@ class FileReadTool(Tool):
 
 
 class FileWriteTool(Tool):
+    def __init__(self, path_guard: PathGuard | None = None) -> None:
+        self._guard = path_guard
+
     @property
     def name(self) -> str:
         return "file_write"
@@ -56,6 +74,12 @@ class FileWriteTool(Tool):
     def execute(self, **kwargs) -> ToolResult:
         path = kwargs.get("path", "")
         content = kwargs.get("content", "")
+
+        if self._guard:
+            err = self._guard.check_path(path)
+            if err:
+                return ToolResult(success=False, output="", error=err)
+
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)

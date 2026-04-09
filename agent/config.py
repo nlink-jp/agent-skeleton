@@ -21,6 +21,12 @@ class AgentConfig:
 
 
 @dataclass
+class SecurityConfig:
+    # Roots in addition to cwd and /tmp that the agent is allowed to access.
+    allowed_paths: list[str] = field(default_factory=list)
+
+
+@dataclass
 class MCPServerConfig:
     transport: str = "stdio"   # "stdio" or "sse"
     command: str = ""
@@ -33,6 +39,7 @@ class MCPServerConfig:
 class Config:
     llm: LLMConfig = field(default_factory=LLMConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
+    security: SecurityConfig = field(default_factory=SecurityConfig)
     mcp_servers: dict[str, MCPServerConfig] = field(default_factory=dict)
 
 
@@ -46,6 +53,7 @@ def load_config(path: Path | None = None) -> Config:
 
     llm = LLMConfig(**{k: v for k, v in data.get("llm", {}).items() if k in LLMConfig.__dataclass_fields__})
     agent = AgentConfig(**{k: v for k, v in data.get("agent", {}).items() if k in AgentConfig.__dataclass_fields__})
+    security = SecurityConfig(**{k: v for k, v in data.get("security", {}).items() if k in SecurityConfig.__dataclass_fields__})
 
     mcp_servers: dict[str, MCPServerConfig] = {}
     for name, srv in data.get("mcp", {}).get("servers", {}).items():
@@ -53,4 +61,4 @@ def load_config(path: Path | None = None) -> Config:
             **{k: v for k, v in srv.items() if k in MCPServerConfig.__dataclass_fields__}
         )
 
-    return Config(llm=llm, agent=agent, mcp_servers=mcp_servers)
+    return Config(llm=llm, agent=agent, security=security, mcp_servers=mcp_servers)

@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import re
 import subprocess
+from typing import TYPE_CHECKING
 
 from .base import Tool, ToolResult
+
+if TYPE_CHECKING:
+    from ..security import PathGuard
 
 # Patterns that are unconditionally refused regardless of user approval.
 # These represent commands that could cause irreversible system damage.
@@ -21,6 +27,9 @@ DANGEROUS_PATTERNS: list[tuple[str, str]] = [
 
 
 class ShellTool(Tool):
+    def __init__(self, path_guard: PathGuard | None = None) -> None:
+        self._guard = path_guard
+
     @property
     def name(self) -> str:
         return "shell_exec"
@@ -54,6 +63,7 @@ class ShellTool(Tool):
         command: str = kwargs.get("command", "")
         timeout: int = int(kwargs.get("timeout", 30))
 
+        # 1. Dangerous pattern check (unconditional — runs before path guard)
         danger = self._check_dangerous(command)
         if danger:
             return ToolResult(
@@ -61,6 +71,12 @@ class ShellTool(Tool):
                 output="",
                 error=f"Refused: command matches dangerous pattern ({danger})",
             )
+
+        # 2. Path guard check (heuristic — scans for absolute paths in command)
+        if self._guard:
+            err = self._guard.check_command(command)
+            if err:
+                return ToolResult(success=False, output="", error=err)
 
         try:
             proc = subprocess.run(

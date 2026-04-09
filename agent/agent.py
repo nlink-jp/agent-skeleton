@@ -9,6 +9,7 @@ from .llm import LLMClient
 from .log import get_logger
 from .memory import Memory
 from .planner import Planner
+from .security import PathGuard
 from .tools.base import Tool
 from .tools.file_tool import FileReadTool, FileWriteTool
 from .tools.shell_tool import ShellTool
@@ -68,10 +69,12 @@ class Agent:
             keep_recent_turns=cfg.agent.keep_recent_turns,
         )
 
+        path_guard = PathGuard(extra_allowed=cfg.security.allowed_paths)
+
         builtin_tools: list[Tool] = [
-            FileReadTool(),
-            FileWriteTool(),
-            ShellTool(),
+            FileReadTool(path_guard=path_guard),
+            FileWriteTool(path_guard=path_guard),
+            ShellTool(path_guard=path_guard),
             WebSearchTool(),
         ]
         mcp_tools = cls._load_mcp_tools(cfg)

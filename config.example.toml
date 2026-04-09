@@ -13,6 +13,13 @@ compress_threshold = 0.75   # Compress history when context reaches this fractio
 keep_recent_turns  = 8      # Number of recent turns to keep verbatim after compression
 max_iterations     = 20     # Maximum LLM iterations per plan step
 
+# --- Security (path restrictions) ---
+# Allowed directory roots in addition to the defaults (cwd and /tmp).
+# File and shell tools refuse access to paths outside these roots.
+# Example:
+# [security]
+# allowed_paths = ["/Users/me/projects", "/var/data"]
+
 # --- MCP servers (optional) ---
 # Add one [[mcp.servers.<name>]] section per server.
 
