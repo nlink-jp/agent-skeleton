@@ -7,13 +7,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
-### Added
-- `agent/security.py`: `PathGuard` — restricts file and shell access to allowed directory roots (cwd, /tmp, and configurable extras)
-- `FileReadTool`, `FileWriteTool`, `ShellTool` now accept `path_guard` constructor argument; paths outside allowed roots return `ToolResult(success=False)` before execution
-- `ShellTool.check_command()`: heuristic absolute-path extraction via `shlex` + redirect regex
-- Config: `[security] allowed_paths` list for additional allowed roots
-- Tests: `tests/test_security.py` — 30+ cases covering `PathGuard`, tool integration, path traversal, and priority ordering (dangerous pattern > path guard)
-
 ## [0.1.0] - 2026-04-09
 
 ### Added
@@ -26,3 +19,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 - Rich-based CLI with plan display and approval prompts
 - Core/UI separation: `agent/` package is independently importable
 - Configuration via `~/.config/agent-skeleton/config.toml` (TOML, defaults provided)
+- `agent/security.py`: `PathGuard` — restricts file and shell tool access to cwd, `/tmp`, and configurable extra roots; blocks `../` traversal
+- `FileReadTool`, `FileWriteTool`, `ShellTool` accept an optional `path_guard` parameter; all path checks happen before execution
+- `ShellTool.check_command()`: heuristic absolute-path extraction from shell commands (handles redirects and quoted args via `shlex`)
+- Config: `[security] allowed_paths` list — extra directory roots users can grant access to
+- Tests: `tests/test_security.py` — 30 tests covering PathGuard, path extraction, tool integration, traversal blocking, and dangerous-pattern priority
+- Verbose structured logging via `agent/log.py`; level controlled by `AGENT_LOG_LEVEL` env var (default `INFO`)
+- Architecture document: `docs/architecture.ja.md`
+
+### Fixed
+- Removed `tool_choice="auto"` from LLM requests — incompatible with Qwen3 jinja chat template in LM Studio
+- Executor message list no longer prepends a second system prompt before history, eliminating consecutive system-message errors on local LLMs
