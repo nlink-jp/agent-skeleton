@@ -66,15 +66,24 @@ def run() -> None:
             console.print(f"[red]計画生成エラー: {e}[/red]")
             continue
 
+        if plan.get("fallback"):
+            console.print(
+                "[yellow]⚠ 構造化された計画を解析できなかったため、"
+                "ゴールを直接実行する計画に切り替えました[/yellow]"
+            )
+
+        has_tool_calls = any(s.get("tool") for s in plan.get("steps", []))
+
         console.print(Panel(
             agent.format_plan(plan),
             title="[bold yellow]実行計画[/bold yellow]",
             border_style="yellow",
         ))
 
-        if not Confirm.ask("この計画を実行しますか?", default=True):
-            console.print("[dim]キャンセルしました[/dim]")
-            continue
+        if has_tool_calls:
+            if not Confirm.ask("この計画を実行しますか?", default=True):
+                console.print("[dim]キャンセルしました[/dim]")
+                continue
 
         # --- 実行 ---
         console.print("\n[dim]実行中...[/dim]")

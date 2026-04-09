@@ -100,6 +100,7 @@ class Planner:
         # Fallback: single-step plan so execution can still proceed
         return {
             "goal": user_goal,
+            "fallback": True,
             "steps": [
                 {
                     "step": 1,
