@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-09
+
+### Fixed
+- Add `[build-system]` (hatchling) and explicit `[tool.hatch.build.targets.wheel]` so `uv tool install .` works correctly
+- Change entry point from `main:main` to `cli.app:run` to avoid referencing a top-level module outside declared packages
+
 ## [0.1.0] - 2026-04-09
 
 ### Added
