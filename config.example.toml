@@ -12,6 +12,7 @@ context_limit = 65536                         # Effective token limit (64K recom
 compress_threshold = 0.75   # Compress history when context reaches this fraction of context_limit
 keep_recent_turns  = 8      # Number of recent turns to keep verbatim after compression
 max_iterations     = 20     # Maximum LLM iterations per plan step
+max_tool_output_chars = 20000  # Truncate tool output exceeding this limit (chars)
 
 # --- Security (path restrictions) ---
 # Allowed directory roots in addition to the defaults (cwd and /tmp).

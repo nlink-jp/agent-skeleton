@@ -69,4 +69,5 @@ Key settings:
 - **Shell safety**: `ShellTool` refuses dangerous commands unconditionally (before the user approval step). The approval callback is never called for refused commands.
 - **Planner JSON fallback**: if the LLM returns malformed JSON, `Planner._parse_plan()` falls back to a single-step plan so execution can still proceed.
 - **Gemma-4 normalisation**: Gemma-4 outputs `<|tool_call>...<tool_call|>` (pipe-delimited) in text mode instead of using OpenAI function calling. The normaliser strips these; `tool_call_stripped` flag distinguishes this from prompt injection.
+- **Config typo detection**: Unknown keys in `config.toml` trigger WARNING logs with the list of valid keys. The unknown keys are silently ignored (defaults used), so typos don't cause errors but also don't take effect.
 - **Core/CLI separation**: `agent/` has no dependency on `cli/`. Import direction is strictly `cli → agent`.

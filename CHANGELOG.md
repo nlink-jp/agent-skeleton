@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-04-10
+
+### Added
+- Executor: truncate tool output exceeding `max_tool_output_chars` (default: 20,000) before adding to LLM context; prevents context window overflow from large file reads or command output
+- Config: `[agent] max_tool_output_chars` setting to control tool output truncation limit
+- Config: warn on unknown keys in config file sections (typo detection); e.g. `compres_threshold` triggers a WARNING log with the list of valid keys
+- Planner: fallback plans now include `"fallback": true` flag; CLI displays a visible warning when the structured plan could not be parsed
+
+### Changed
+- CLI: skip plan approval prompt when the plan contains no tool calls (text-only plans execute immediately after display)
+
 ## [0.1.24] - 2026-04-10
 
 ### Fixed

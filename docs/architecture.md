@@ -1,6 +1,6 @@
 # Architecture Document — agent-skeleton
 
-> Target version: v0.1.24
+> Target version: v0.1.25
 > Status: Proof of Concept (POC) — verified to work, not intended for production use
 
 ---
@@ -271,6 +271,7 @@ The Executor never displays anything to the user or captures input directly. App
 | `_deduplicate()` | Remove duplicate tool_calls with the same `(name, arguments)` (Gemma-4 workaround) |
 | `_build_result()` | Unified output for normal summary or injection-detection fallback. Also removes `[アクション N]` labels echoed by the LLM |
 | `_wrap_tool_output()` | Prompt injection countermeasure framing (see S9.2) |
+| `_truncate_tool_output()` | Truncates tool output exceeding `max_tool_output_chars` (prevents context blowup) |
 | `_ACTION_LABEL_RE` | Regex to remove `[アクション N]` prefixes copied by the LLM from previous results |
 
 ---
@@ -365,7 +366,9 @@ Agent.plan(user_goal)
               → Returns JSON plan
   │
   ▼
-CLI displays plan → User approves or cancels
+CLI displays plan
+  ├── Plan contains tool calls → User approves or cancels
+  └── Plan contains no tool calls → Approval skipped (immediate execution)
   │
   ▼ (if approved)
 Agent.execute(user_goal, plan)           ← plan is for display but tool_hints are extracted
@@ -401,7 +404,8 @@ execute_react(goal, history, tool_hints=None)
   │              approver(tool_name, args, reason) → y/n                             │
   │                → n: "Skipped" as tool_output                                     │
   │                → y: _run_tool() → ToolResult                                     │
-  │              Add tool(content=_wrap_tool_output(output)) to messages              │
+  │              _truncate_tool_output(output)  ← Truncate if exceeds max_tool_output_chars
+  │              Add tool(content=_wrap_tool_output(truncated)) to messages            │
   │         4. LLM call (no tools) → Intermediate summary                            │
   │              ├─ Summary present: "[アクション N] summary" → results              │
   │              ├─ Summary empty + tool_call_stripped:                               │
@@ -478,9 +482,10 @@ The ReAct loop context (B) grows with each iteration as tool results accumulate.
 |------|---------|------|
 | Memory 2-tier compression | Between turns | Replaces old conversation turns with LLM summaries, keeping the verbatim portion at a fixed count |
 | `max_iterations` limit | ReAct loop | Prevents unbounded growth (default: 20 iterations) |
+| `max_tool_output_chars` truncation | Tool output → before adding to messages | Truncates long output to prevent rapid context blowup (default: 20000 chars) |
 | `context_limit * compress_threshold` | Memory.add() | Triggers compression when estimated tokens exceed the threshold |
 
-**Note:** The context within the ReAct loop (accumulated tool results) is currently not compressed. Calling many tools within a single turn may exceed `context_limit`. This is a POC trade-off (see S13).
+**Note:** The context within the ReAct loop (accumulated tool results) is not compressed. `max_tool_output_chars` truncation mitigates rapid blowup, but calling many tools within a single turn may still exceed `context_limit`.
 
 ### 6.3 What Each Component Puts in the Context
 
@@ -760,6 +765,7 @@ context_limit = 65536                        # Effective token limit (64K)
 compress_threshold = 0.75   # Memory compression triggers at this ratio of context_limit
 keep_recent_turns  = 8      # Number of turns to keep verbatim after compression
 max_iterations     = 20     # Maximum iterations for the ReAct loop
+max_tool_output_chars = 20000  # Tool output truncation limit (characters)
 
 [security]
 allowed_paths = []          # List of root paths to add to PathGuard
