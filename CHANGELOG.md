@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-04-09
+
+### Fixed
+- Executor: exclude old user/assistant conversation turns from tool-call messages; only system messages (agent prompt + compressed summary) are forwarded to each step. Previous turns caused the LLM to hallucinate tool arguments from stale memory instead of current step context.
+
 ## [0.1.6] - 2026-04-09
 
 ### Changed

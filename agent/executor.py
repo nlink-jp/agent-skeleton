@@ -83,11 +83,14 @@ class Executor:
             return f"[ステップ {n}] エラー: ツール '{tool_name}' が見つかりません"
 
         # Ask LLM to determine exact arguments via tool_call.
-        # history[0] is already a system message; prepending another causes
-        # consecutive system messages that break some local LLM jinja templates.
+        # Only carry system messages from history (agent prompt + optional
+        # compressed summary). Old user/assistant turns are excluded: they
+        # belong to previous tasks and cause the LLM to hallucinate tool
+        # arguments from stale content instead of the current step context.
         context = self._build_context(description, reason, previous_results)
+        system_messages = [m for m in history if m["role"] == "system"]
         messages = [
-            *history,
+            *system_messages,
             {"role": "user", "content": context},
         ]
         log.debug("Step %d: sending %d messages to LLM with tool '%s'", n, len(messages), tool_name)
