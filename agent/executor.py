@@ -166,6 +166,18 @@ class Executor:
                     "content": tool_output,
                 })
 
+            # All tool results appended. Call LLM *without* tools to force a
+            # text response. Local LLMs loop indefinitely when a tool schema is
+            # present in every turn, so we never pass tools again after the
+            # first round of execution.
+            log.debug(
+                "Step %d iteration %d: calling LLM without tools to collect result",
+                n, iteration + 1,
+            )
+            final = self._llm.chat(messages)
+            log.debug("Step %d: final LLM response collected", n)
+            return f"[ステップ {n}] {final.content or '完了'}"
+
         log.warning("Step %d: reached max_iterations (%d)", n, self._max_iterations)
         return f"[ステップ {n}] 最大反復回数({self._max_iterations})に達しました"
 

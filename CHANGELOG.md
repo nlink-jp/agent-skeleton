@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-09
+
+### Fixed
+- Executor: call LLM without tools after each tool-execution round to force a text response; prevents infinite tool-call loops on local LLMs (Qwen3 etc.)
+
 ## [0.1.1] - 2026-04-09
 
 ### Fixed
