@@ -9,6 +9,7 @@ Responsibilities:
 
 from __future__ import annotations
 
+from prompt_toolkit import prompt as pt_prompt
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -46,10 +47,9 @@ def run() -> None:
 
     while True:
         try:
-            # Prompt.ask() / console.print() + input() のどちらも ANSI エスケープが
-            # readline のカーソル位置計算を狂わせ、マルチバイト文字の BS が壊れる。
-            # プロンプト文字列を input() に直接渡すと readline が文字数を正しく把握できる。
-            user_input = input("\nあなた: ").strip()
+            # prompt_toolkit は wcwidth ベースで文字幅を計算するため、
+            # macOS の libedit では壊れるマルチバイト文字の BS・カーソル移動が正しく動く。
+            user_input = pt_prompt("\nあなた: ").strip()
         except (KeyboardInterrupt, EOFError):
             break
 

@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-04-09
+
+### Changed
+- CLI: replace `input()` with `prompt_toolkit.prompt()` for user message entry; fixes multibyte (Japanese/CJK) cursor movement and deletion on macOS where Python's `input()` is backed by libedit instead of GNU readline
+
 ## [0.1.8] - 2026-04-09
 
 ### Fixed
