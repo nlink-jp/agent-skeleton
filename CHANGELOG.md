@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-04-09
+
+### Added
+- Demo files: `demo/attack.md` (adversarial file disguised as a procedure document) and `demo/procedure.md` (legitimate procedure — positive control)
+- `docs/demo-prompt-injection.ja.md`: walkthrough of attack/legitimate scenarios, defence layers and their limits, and three fundamental questions the POC raises
+
 ## [0.1.19] - 2026-04-09
 
 ### Security
