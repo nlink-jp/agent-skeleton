@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-09
+
+### Fixed
+- Executor: deduplicate tool_calls by `(name, arguments)` before processing; some models (e.g. Gemma-4) return dozens of identical calls in a single response
+
 ## [0.1.4] - 2026-04-09
 
 ### Fixed

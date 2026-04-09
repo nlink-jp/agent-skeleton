@@ -101,6 +101,21 @@ class Executor:
                 log.debug("Step %d: LLM returned text (no tool_call)", n)
                 return f"[ステップ {n}] {response.content or '完了'}"
 
+            # Deduplicate tool_calls by (name, arguments) — some models (e.g. Gemma-4)
+            # return dozens of identical calls in a single response.
+            seen: set[tuple[str, str]] = set()
+            unique_tool_calls = []
+            for tc in response.tool_calls:
+                key = (tc.function.name, tc.function.arguments)
+                if key not in seen:
+                    seen.add(key)
+                    unique_tool_calls.append(tc)
+            if len(unique_tool_calls) < len(response.tool_calls):
+                log.warning(
+                    "Step %d: deduplicated tool_calls %d → %d",
+                    n, len(response.tool_calls), len(unique_tool_calls),
+                )
+
             # Process tool calls
             assistant_msg = {
                 "role": "assistant",
@@ -114,12 +129,12 @@ class Executor:
                             "arguments": tc.function.arguments,
                         },
                     }
-                    for tc in response.tool_calls
+                    for tc in unique_tool_calls
                 ],
             }
             messages.append(assistant_msg)
 
-            for tc in response.tool_calls:
+            for tc in unique_tool_calls:
                 fn_name = tc.function.name
                 try:
                     fn_args = json.loads(tc.function.arguments)
