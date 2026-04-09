@@ -117,11 +117,16 @@ class Agent:
         after observing all accumulated results, so sub-steps discovered at
         runtime (e.g. inside a procedure document) are handled naturally.
         """
-        log.info("Agent.execute: starting plan with %d step(s)", len(plan.get("steps", [])))
+        steps = plan.get("steps", [])
+        log.info("Agent.execute: starting plan with %d step(s)", len(steps))
         history = self._memory.get_messages(AGENT_SYSTEM_PROMPT)
         log.debug("Agent.execute: history has %d message(s)", len(history))
 
-        step_results = self._executor.execute_react(user_goal, history)
+        # Extract tool names from the plan as non-binding hints for the
+        # ReAct loop so the LLM is more likely to pick the right tools.
+        tool_hints = [s["tool"] for s in steps if s.get("tool")]
+
+        step_results = self._executor.execute_react(user_goal, history, tool_hints=tool_hints)
         combined = "\n".join(step_results)
 
         self._memory.add("user", user_goal)

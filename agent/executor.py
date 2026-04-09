@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -12,6 +13,10 @@ if TYPE_CHECKING:
     from .tools.base import Tool
 
 log = get_logger(__name__)
+
+# Pattern to strip duplicated action labels that the LLM sometimes echoes
+# from earlier results (e.g. "[アクション 1] ..." copied into a new response).
+_ACTION_LABEL_RE = re.compile(r"^\[アクション \d+\]\s*")
 
 # Signature: (tool_name: str, args: dict, reason: str) -> bool
 ApproverFn = Callable[[str, dict, str], bool]
@@ -46,7 +51,9 @@ def _build_result(label: str, content: str, raw_outputs: list[str]) -> str:
     exist, they are returned with a visible injection-detection warning.
     """
     if content:
-        return f"[{label}] {content}"
+        # Strip echoed action labels the LLM copies from earlier results
+        clean = _ACTION_LABEL_RE.sub("", content)
+        return f"[{label}] {clean}"
     if raw_outputs:
         log.warning(
             "%s: LLM summary was empty after normalisation; "
@@ -85,7 +92,12 @@ class Executor:
     # ReAct execution (primary path)
     # ------------------------------------------------------------------
 
-    def execute_react(self, goal: str, history: list[dict]) -> list[str]:
+    def execute_react(
+        self,
+        goal: str,
+        history: list[dict],
+        tool_hints: list[str] | None = None,
+    ) -> list[str]:
         """ReAct loop: LLM dynamically picks any tool at each iteration.
 
         Unlike execute_plan, no fixed sequence of steps is assumed.  The LLM
@@ -93,10 +105,26 @@ class Executor:
         including executing sub-steps discovered at runtime (e.g. inside a
         procedure document).  Execution stops when the LLM emits a text
         response without tool calls, or when max_iterations is reached.
+
+        *tool_hints* is an optional list of tool names from the planner.
+        When present, they are included as a non-binding hint in the user
+        message so the LLM is more likely to pick the right tools.
         """
         all_schemas = [t.to_openai_schema() for t in self._tools.values()]
-        system_messages = [m for m in history if m["role"] == "system"]
-        messages = [*system_messages, {"role": "user", "content": goal}]
+
+        # Include full conversation history (system + prior user/assistant
+        # turns) so the LLM knows what has already been done or discussed.
+        prior_messages = [
+            m for m in history
+            if m["role"] in ("system", "user", "assistant")
+        ]
+
+        user_content = goal
+        if tool_hints:
+            hint_str = ", ".join(tool_hints)
+            user_content += f"\n\nHint: the plan suggests using these tools: {hint_str}"
+
+        messages = [*prior_messages, {"role": "user", "content": user_content}]
 
         results: list[str] = []
         action_n = 0
@@ -155,7 +183,27 @@ class Executor:
             # Force a text response (no tools) to get an interim summary.
             # Omitting tools here prevents infinite tool-call loops on local LLMs.
             summary = self._llm.chat(messages)
-            results.append(_build_result(f"アクション {action_n}", summary.content, raw_outputs))
+
+            # When the summary is empty because the model hallucinated a
+            # tool-call in text mode (common with Gemma-4, Qwen3), this is
+            # NOT a prompt-injection signal — just the model trying to chain
+            # tools.  Skip the injection warning in this case.
+            if not summary.content and summary.tool_call_stripped:
+                log.info(
+                    "アクション %d: summary empty after stripping hallucinated "
+                    "tool_call (not injection)",
+                    action_n,
+                )
+                results.append(f"[アクション {action_n}] 完了")
+            else:
+                results.append(_build_result(f"アクション {action_n}", summary.content, raw_outputs))
+
+            # Append summary to messages so the LLM retains context on the
+            # next iteration (e.g. knows it already ran ls and should now
+            # call file_read).  Without this, the LLM loses track of its
+            # own interim reasoning and may repeat or abandon steps.
+            if summary.content:
+                messages.append({"role": "assistant", "content": summary.content})
 
         else:
             log.warning("ReAct: reached max_iterations (%d)", self._max_iterations)

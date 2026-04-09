@@ -192,3 +192,148 @@ def test_execute_react_user_denies_tool():
     # Tool output should not be "secret data" since it was skipped
     combined = "\n".join(results)
     assert "secret data" not in combined
+
+
+# ---------------------------------------------------------------------------
+# Forced summary is appended to messages for context retention
+# ---------------------------------------------------------------------------
+
+def test_execute_react_summary_appended_to_messages():
+    """After forced summary, the summary is added to messages so the LLM
+    retains context on the next iteration."""
+    tool = _EchoTool("listing done")
+    llm = MagicMock()
+
+    tc1 = _make_tool_call()
+    tc2 = _make_tool_call()
+
+    llm.chat.side_effect = [
+        LLMResponse(content="", tool_calls=[tc1]),            # iter 1: tool
+        LLMResponse(content="lsの結果を確認しました", tool_calls=[]),  # iter 1: summary
+        LLMResponse(content="", tool_calls=[tc2]),            # iter 2: tool
+        LLMResponse(content="ファイルを読みました", tool_calls=[]),    # iter 2: summary
+        LLMResponse(content="完了", tool_calls=[]),           # iter 3: done
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    executor.execute_react("ファイルを確認して", history=[])
+
+    # Inspect the messages passed to the 3rd LLM call (iter 2 tool selection).
+    # It should contain the iter-1 summary as an assistant message.
+    third_call_messages = llm.chat.call_args_list[2][0][0]
+    assistant_texts = [
+        m["content"] for m in third_call_messages if m["role"] == "assistant"
+    ]
+    assert any("lsの結果を確認しました" in t for t in assistant_texts)
+
+
+# ---------------------------------------------------------------------------
+# Tool hints from plan are included in goal message
+# ---------------------------------------------------------------------------
+
+def test_execute_react_tool_hints_in_goal():
+    """When tool_hints are provided, they appear in the user message."""
+    tool = _EchoTool("ok")
+    llm = MagicMock()
+
+    llm.chat.side_effect = [
+        LLMResponse(content="完了", tool_calls=[]),
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    executor.execute_react(
+        "ファイルを読んで",
+        history=[],
+        tool_hints=["file_read"],
+    )
+
+    # First LLM call's messages should contain the hint
+    first_call_messages = llm.chat.call_args_list[0][0][0]
+    user_msgs = [m["content"] for m in first_call_messages if m["role"] == "user"]
+    assert any("file_read" in m for m in user_msgs)
+
+
+def test_execute_react_no_hints_no_extra_text():
+    """When tool_hints is empty or None, the goal is passed as-is."""
+    tool = _EchoTool("ok")
+    llm = MagicMock()
+
+    llm.chat.side_effect = [
+        LLMResponse(content="完了", tool_calls=[]),
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    executor.execute_react("ファイルを読んで", history=[], tool_hints=None)
+
+    first_call_messages = llm.chat.call_args_list[0][0][0]
+    user_msgs = [m["content"] for m in first_call_messages if m["role"] == "user"]
+    assert any(m == "ファイルを読んで" for m in user_msgs)  # no hint appended
+
+
+# ---------------------------------------------------------------------------
+# Conversation history is passed to ReAct loop
+# ---------------------------------------------------------------------------
+
+def test_execute_react_no_injection_warning_on_stripped_tool_call():
+    """When forced summary is empty because a hallucinated tool_call was
+    stripped, the injection warning must NOT be shown."""
+    tool = _EchoTool("file content here")
+    llm = MagicMock()
+
+    tc = _make_tool_call()
+
+    # Simulate: tool call → forced summary empty with tool_call_stripped
+    llm.chat.side_effect = [
+        LLMResponse(content="", tool_calls=[tc]),                      # iter 1: tool
+        LLMResponse(content="", tool_calls=[], tool_call_stripped=True),  # summary: stripped
+        LLMResponse(content="完了", tool_calls=[]),                    # iter 2: done
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    results = executor.execute_react("ファイルを読んで", history=[])
+
+    combined = "\n".join(results)
+    assert "⚠" not in combined
+    assert "インジェクション" not in combined
+
+
+def test_build_result_strips_echoed_action_label():
+    """LLM sometimes echoes [アクション N] from earlier results; _build_result
+    must strip the duplicate to avoid nested labels."""
+    from agent.executor import _build_result
+
+    content = "[アクション 1] ファイルをコピーしました"
+    result = _build_result("アクション 2", content, [])
+    assert result == "[アクション 2] ファイルをコピーしました"
+
+
+def test_execute_react_includes_conversation_history():
+    """ReAct loop must include prior user/assistant turns from history so the
+    LLM knows what was done in previous conversation rounds."""
+    tool = _EchoTool("ok")
+    llm = MagicMock()
+
+    llm.chat.side_effect = [
+        LLMResponse(content="完了", tool_calls=[]),
+    ]
+
+    history = [
+        {"role": "system", "content": "You are an agent."},
+        {"role": "user", "content": "test.mdを作って"},
+        {"role": "assistant", "content": "test.mdを作成しました"},
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    executor.execute_react("作ったファイルの中身がみたいです", history=history)
+
+    first_call_messages = llm.chat.call_args_list[0][0][0]
+    roles = [m["role"] for m in first_call_messages]
+    contents = [m["content"] for m in first_call_messages]
+
+    # History turns must be present
+    assert "system" in roles
+    assert any("test.mdを作って" in c for c in contents)
+    assert any("test.mdを作成しました" in c for c in contents)
+    # Current goal must be the last user message
+    assert first_call_messages[-1]["role"] == "user"
+    assert "作ったファイルの中身がみたいです" in first_call_messages[-1]["content"]
