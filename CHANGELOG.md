@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-04-09
+
+### Fixed
+- LLMClient: strip GPT-OSS `<|special_token|>` markup at the LLM layer (was only stripped in executor); prevents `<|start|>`, `<|channel|>`, `<|message|>` etc. from reaching the planner and memory
+
 ## [0.1.16] - 2026-04-09
 
 ### Fixed

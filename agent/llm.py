@@ -23,6 +23,12 @@ _MISTRAL_TOKEN_RE = re.compile(
     re.IGNORECASE,
 )
 
+# GPT-OSS / gpt-oss-20b and similar models emit <|token|> special tokens
+# (e.g. <|start|>, <|channel|>, <|message|>) followed by model-internal
+# structured output.  Everything from the first such token onwards is
+# model-internal and must be discarded.
+_GPT_OSS_TOKEN_RE = re.compile(r"<\|[a-zA-Z0-9_]+\|>")
+
 
 @dataclass
 class LLMResponse:
@@ -71,6 +77,11 @@ class LLMClient:
         clean_content = _MISTRAL_TOKEN_RE.sub("", clean_content).strip()
         if clean_content != before_mistral:
             log.debug("Stripped Mistral instruction tokens from LLM response")
+        if _GPT_OSS_TOKEN_RE.search(clean_content):
+            # Discard everything from the first <|token|> onwards — it is all
+            # model-internal structured output (channel directives, JSON payloads).
+            clean_content = _GPT_OSS_TOKEN_RE.split(clean_content, maxsplit=1)[0].strip()
+            log.warning("Stripped GPT-OSS <|special_token|> markup from LLM response")
 
         if msg.tool_calls:
             calls = [(tc.function.name, tc.function.arguments[:80]) for tc in msg.tool_calls]
