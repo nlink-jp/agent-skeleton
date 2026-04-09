@@ -116,6 +116,8 @@ class Executor:
         ]
         log.debug("Step %d: sending %d messages to LLM with tool '%s'", n, len(messages), tool_name)
 
+        raw_tool_outputs: list[str] = []  # fallback when LLM response is stripped
+
         for iteration in range(self._max_iterations):
             log.debug("Step %d iteration %d/%d", n, iteration + 1, self._max_iterations)
             response = self._llm.chat(messages, tools=[tool.to_openai_schema()])
@@ -199,6 +201,7 @@ class Executor:
                             )
                             tool_output = f"エラー: {result.error}"
 
+                raw_tool_outputs.append(tool_output)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
@@ -215,7 +218,19 @@ class Executor:
             )
             final = self._llm.chat(messages)
             log.debug("Step %d: final LLM response collected", n)
-            return f"[ステップ {n}] {final.content or "完了"}"
+            if final.content:
+                return f"[ステップ {n}] {final.content}"
+            # LLM response was empty (e.g. stripped by normalisation after prompt
+            # injection manipulated the model). Fall back to the raw tool outputs so
+            # the user still gets the actual data the tool returned.
+            if raw_tool_outputs:
+                log.warning(
+                    "Step %d: LLM summary was empty after normalisation; "
+                    "returning raw tool output(s) directly",
+                    n,
+                )
+                return f"[ステップ {n}]\n" + "\n---\n".join(raw_tool_outputs)
+            return f"[ステップ {n}] 完了"
 
         log.warning("Step %d: reached max_iterations (%d)", n, self._max_iterations)
         return f"[ステップ {n}] 最大反復回数({self._max_iterations})に達しました"

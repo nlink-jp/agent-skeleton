@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-04-09
+
+### Fixed
+- Executor: when the final LLM summary is empty after normalisation (i.e. the model was manipulated by prompt injection and its response was stripped), fall back to the raw tool output so the user still receives the actual data the tool returned; previously the step result was just `完了` with no useful content
+
 ## [0.1.20] - 2026-04-09
 
 ### Added
