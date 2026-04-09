@@ -2,6 +2,10 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .log import get_logger
+
+log = get_logger(__name__)
+
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "agent-skeleton" / "config.toml"
 
 
@@ -18,6 +22,7 @@ class AgentConfig:
     compress_threshold: float = 0.75
     keep_recent_turns: int = 8
     max_iterations: int = 20
+    max_tool_output_chars: int = 20000
 
 
 @dataclass
@@ -51,14 +56,32 @@ def load_config(path: Path | None = None) -> Config:
     with open(resolved, "rb") as f:
         data = tomllib.load(f)
 
-    llm = LLMConfig(**{k: v for k, v in data.get("llm", {}).items() if k in LLMConfig.__dataclass_fields__})
-    agent = AgentConfig(**{k: v for k, v in data.get("agent", {}).items() if k in AgentConfig.__dataclass_fields__})
-    security = SecurityConfig(**{k: v for k, v in data.get("security", {}).items() if k in SecurityConfig.__dataclass_fields__})
+    llm = _build_section(LLMConfig, data.get("llm", {}), "llm")
+    agent = _build_section(AgentConfig, data.get("agent", {}), "agent")
+    security = _build_section(SecurityConfig, data.get("security", {}), "security")
+
+    # Top-level unknown keys (excluding known sections)
+    known_top = {"llm", "agent", "security", "mcp"}
+    for key in data:
+        if key not in known_top:
+            log.warning("config: unknown top-level key '%s' (typo?)", key)
 
     mcp_servers: dict[str, MCPServerConfig] = {}
     for name, srv in data.get("mcp", {}).get("servers", {}).items():
-        mcp_servers[name] = MCPServerConfig(
-            **{k: v for k, v in srv.items() if k in MCPServerConfig.__dataclass_fields__}
+        mcp_servers[name] = _build_section(
+            MCPServerConfig, srv, f"mcp.servers.{name}",
         )
 
     return Config(llm=llm, agent=agent, security=security, mcp_servers=mcp_servers)
+
+
+def _build_section(cls: type, raw: dict, section: str):
+    """Build a dataclass from raw dict, warning on unknown keys."""
+    known = cls.__dataclass_fields__
+    for key in raw:
+        if key not in known:
+            log.warning(
+                "config [%s]: unknown key '%s' (typo?); known keys: %s",
+                section, key, ", ".join(sorted(known)),
+            )
+    return cls(**{k: v for k, v in raw.items() if k in known})
