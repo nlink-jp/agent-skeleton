@@ -18,6 +18,9 @@ htmlcov/
 *.local.yaml
 *.local.json
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # macOS
 .DS_Store
 
