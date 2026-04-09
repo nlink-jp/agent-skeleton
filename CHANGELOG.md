@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-04-09
+
+### Fixed
+- LLMClient: extend thinking-block stripping to `[THINK]...[/THINK]` square-bracket variant (used by some Qwen builds)
+
 ## [0.1.15] - 2026-04-09
 
 ### Fixed

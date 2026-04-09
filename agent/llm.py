@@ -9,9 +9,10 @@ from .log import get_logger
 log = get_logger(__name__)
 
 # Thinking / reasoning blocks emitted by chain-of-thought models.
+# Covers both angle-bracket (<think>) and square-bracket ([THINK]) variants.
 # Strip the entire block — callers only need the final answer.
 _THINK_RE = re.compile(
-    r"<(think|thinking|reasoning)>.*?</\1>",
+    r"(<(think|thinking|reasoning)>.*?</\2>|\[THINK\].*?\[/THINK\])",
     re.DOTALL | re.IGNORECASE,
 )
 
