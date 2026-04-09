@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Confirm
 
 from agent import Agent
 
@@ -46,7 +46,10 @@ def run() -> None:
 
     while True:
         try:
-            user_input = Prompt.ask("\n[bold green]あなた[/bold green]").strip()
+            # Rich の Prompt.ask() はマルチバイト文字の BS を正しく扱えないため、
+            # プロンプト表示のみ Rich に任せ、入力収集は組み込み input() を使う。
+            console.print("\n[bold green]あなた[/bold green]: ", end="")
+            user_input = input().strip()
         except (KeyboardInterrupt, EOFError):
             break
 

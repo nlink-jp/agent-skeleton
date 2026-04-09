@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) +
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-09
+
+### Fixed
+- CLI: replace `rich.prompt.Prompt.ask()` with `console.print()` + `input()` for user message entry; fixes backspace corruption of multibyte (Japanese/CJK) characters
+
 ## [0.1.2] - 2026-04-09
 
 ### Fixed
