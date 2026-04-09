@@ -12,6 +12,8 @@ def test_wrap_tool_output_has_framing():
     result = _wrap_tool_output("some content")
     assert "[TOOL OUTPUT" in result
     assert "[END TOOL OUTPUT]" in result
+    # Framing must clarify authority (system prompt / user request), not just "distrust"
+    assert "system prompt" in result or "authoritative" in result
 
 
 def test_wrap_tool_output_injection_attempt_is_framed():
