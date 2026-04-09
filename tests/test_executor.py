@@ -123,3 +123,72 @@ def test_executor_uses_llm_summary_when_present():
 
     assert "ファイルの内容を確認しました" in results[0]
     assert "raw content" not in results[0]
+
+
+# ---------------------------------------------------------------------------
+# execute_react: dynamic ReAct loop
+# ---------------------------------------------------------------------------
+
+def test_execute_react_single_tool_then_done():
+    """ReAct: one tool call followed by a text response (completion)."""
+    tool = _EchoTool("手順1: ファイルを作成する")
+    llm = MagicMock()
+
+    # Iteration 1: LLM picks a tool
+    iter1_with_tool = LLMResponse(content="", tool_calls=[_make_tool_call()])
+    # After tool: LLM gives interim summary
+    iter1_summary = LLMResponse(content="ファイル内容を確認しました", tool_calls=[])
+    # Iteration 2: LLM signals done (no tool calls)
+    iter2_done = LLMResponse(content="すべての手順を完了しました", tool_calls=[])
+
+    llm.chat.side_effect = [iter1_with_tool, iter1_summary, iter2_done]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    results = executor.execute_react("手順書を読んで実行して", history=[])
+
+    assert any("ファイル内容を確認しました" in r for r in results)
+    assert any("すべての手順を完了しました" in r for r in results)
+
+
+def test_execute_react_multi_tool_sequence():
+    """ReAct: LLM calls multiple tools across iterations before finishing."""
+    tool = _EchoTool("ok")
+    llm = MagicMock()
+
+    tc1 = _make_tool_call()
+    tc2 = _make_tool_call()
+
+    llm.chat.side_effect = [
+        LLMResponse(content="", tool_calls=[tc1]),   # iter 1: tool call
+        LLMResponse(content="ステップ1完了", tool_calls=[]),  # iter 1: summary
+        LLMResponse(content="", tool_calls=[tc2]),   # iter 2: tool call
+        LLMResponse(content="ステップ2完了", tool_calls=[]),  # iter 2: summary
+        LLMResponse(content="全部完了", tool_calls=[]),       # iter 3: done
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: True)
+    results = executor.execute_react("全部やって", history=[])
+
+    combined = "\n".join(results)
+    assert "ステップ1完了" in combined
+    assert "ステップ2完了" in combined
+    assert "全部完了" in combined
+
+
+def test_execute_react_user_denies_tool():
+    """ReAct: user denies a tool call → output contains skip message."""
+    tool = _EchoTool("secret data")
+    llm = MagicMock()
+
+    llm.chat.side_effect = [
+        LLMResponse(content="", tool_calls=[_make_tool_call()]),
+        LLMResponse(content="スキップされました", tool_calls=[]),
+        LLMResponse(content="完了", tool_calls=[]),
+    ]
+
+    executor = Executor(llm=llm, tools=[tool], approver=lambda *_: False)
+    results = executor.execute_react("やって", history=[])
+
+    # Tool output should not be "secret data" since it was skipped
+    combined = "\n".join(results)
+    assert "secret data" not in combined

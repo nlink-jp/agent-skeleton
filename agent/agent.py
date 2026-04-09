@@ -110,12 +110,18 @@ class Agent:
         return self._planner.format_plan(plan)
 
     def execute(self, user_goal: str, plan: dict) -> str:
-        """Execute plan, record in memory, return combined result."""
+        """Execute the goal via ReAct loop, record in memory, return combined result.
+
+        The *plan* argument is retained for display / approval in the CLI but
+        execution itself is dynamic: the LLM decides which tool to call next
+        after observing all accumulated results, so sub-steps discovered at
+        runtime (e.g. inside a procedure document) are handled naturally.
+        """
         log.info("Agent.execute: starting plan with %d step(s)", len(plan.get("steps", [])))
         history = self._memory.get_messages(AGENT_SYSTEM_PROMPT)
         log.debug("Agent.execute: history has %d message(s)", len(history))
 
-        step_results = self._executor.execute_plan(plan, history)
+        step_results = self._executor.execute_react(user_goal, history)
         combined = "\n".join(step_results)
 
         self._memory.add("user", user_goal)
